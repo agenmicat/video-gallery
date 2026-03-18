@@ -342,3 +342,30 @@ header h1 {
     .video-player { height: 50vh; }
     .form-group input { min-width: 100%; }
 }
+.video-thumbnail {
+    position: relative;
+    /* ... styles sebelum ... */
+}
+
+.btn-delete {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: rgba(255,0,0,0.8);
+    border: none;
+    border-radius: 50%;
+    color: white;
+    font-weight: bold;
+    font-size: 1rem;
+    cursor: pointer;
+    width: 28px;
+    height: 28px;
+    line-height: 26px;
+    text-align: center;
+    transition: background 0.3s;
+    z-index: 10;
+}
+
+.btn-delete:hover {
+    background: rgba(255,0,0,1);
+}

@@ -64,7 +64,33 @@ class VideoGallery {
     // Simpan juga lokal
     localStorage.setItem('videoGallery', JSON.stringify(this.allVideos));
   }
+deleteVideo = async (id) => {
+  if (!confirm('Yakin ingin menghapus video ini? Tindakan ini tidak bisa dibatalkan.')) {
+    return;
+  }
 
+  try {
+    const response = await fetch(`${this.apiUrl}?id=${id}`, {
+      method: 'DELETE',
+    });
+
+    const result = await response.json();
+
+    if (result.success) {
+      // Hapus dari state lokal
+      this.allVideos = this.allVideos.filter(video => video.id.toString() !== id.toString());
+      this.filteredVideos = this.filteredVideos.filter(video => video.id.toString() !== id.toString());
+
+      this.updateTagFilter();
+      this.renderVideos();
+      alert('✅ Video berhasil dihapus!');
+    } else {
+      alert('⚠️ Gagal hapus video: ' + result.message);
+    }
+  } catch (error) {
+    alert('⚠️ Error saat menghapus video: ' + error.message);
+  }
+}
   // Update filter berdasarkan kategori dan pencarian
   applyFilter = () => {
     this.filteredVideos = this.allVideos.filter(video => {
@@ -100,29 +126,31 @@ class VideoGallery {
   }
 
   createVideoCard = video => {
-    const card = document.createElement('div');
-    card.className = 'video-card';
-    card.dataset.videoId = video.id;
+  const card = document.createElement('div');
+  card.className = 'video-card';
+  card.dataset.videoId = video.id;
 
-    const tagsHTML = video.tags && video.tags.length > 0 
-      ? video.tags.map(tag => `<span class="tag-badge" onclick="gallery.filterByTag('${tag}'); event.stopPropagation();">${tag}</span>`).join('') 
-      : '';
+  const tagsHTML = video.tags && video.tags.length > 0
+    ? video.tags.map(tag => `<span class="tag-badge" onclick="gallery.filterByTag('${tag}'); event.stopPropagation();">${tag}</span>`).join('')
+    : '';
 
-    card.innerHTML = `
-      <div class="video-thumbnail">
-        <img src="${video.thumbnail || 'https://via.placeholder.com/1280x720/333/fff?text=No+Image'}" 
-             alt="${video.title}" loading="lazy"
-             onerror="this.src='https://via.placeholder.com/1280x720/333/fff?text=No+Image'">
-      </div>
-      <div class="video-info">
-        <h3>${video.title}</h3>
-        <p>⏱️ ${video.duration}</p>
-      </div>
-      <div class="tags-container">${tagsHTML}</div>
-    `;
-    card.addEventListener('click', () => this.openModal(video.id));
-    return card;
-  }
+  card.innerHTML = `
+    <div class="video-thumbnail">
+      <img src="${video.thumbnail || 'https://via.placeholder.com/1280x720/333/fff?text=No+Image'}" 
+          alt="${video.title}" loading="lazy"
+          onerror="this.src='https://via.placeholder.com/1280x720/333/fff?text=No+Image'">
+      <button class="btn-delete" title="Hapus Video" 
+          onclick="gallery.deleteVideo('${video.id}'); event.stopPropagation();">✖</button>
+    </div>
+    <div class="video-info">
+      <h3>${video.title}</h3>
+      <p>⏱️ ${video.duration}</p>
+    </div>
+    <div class="tags-container">${tagsHTML}</div>
+  `;
+  card.addEventListener('click', () => this.openModal(video.id));
+  return card;
+}
 
   renderPagination = () => {
     const totalPages = Math.ceil(this.filteredVideos.length / this.videosPerPage);
