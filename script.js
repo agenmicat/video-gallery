@@ -1,46 +1,25 @@
 class VideoGallery {
     constructor() {
-        // 🔥 GANTI DENGAN R2 PUBLIC URL KAMU!
-        // Contoh: https://pub-abcd1234.r2.dev/videos.json
         this.r2Url = 'https://pub-1f29bbf92bc64161a3a07e91bfba7525.r2.dev/videos.json';
-        
-        this.loadVideos().then(videos => {
-            this.videos = videos.length ? videos : [
-                {
-                    id: 1,
-                    title: "👋 Mulai tambah video!",
-                    thumbnail: "https://source.unsplash.com/1280x720/?cinema,dark",
-                    embed: "https://voe.sx/e/dQw4w9WgXcQ",
-                    type: "iframe",
-                    duration: "Demo"
-                }
-            ];
-            this.init();
-        });
+        this.videos = [];
+        this.currentPage = 1;
+        this.videosPerPage = 20; // 4x5 = 20
+        this.loadVideos().then(() => this.init());
     }
 
     async loadVideos() {
         try {
-            console.log('📡 Loading from R2:', this.r2Url);
             const response = await fetch(this.r2Url);
             if (response.ok) {
-                const videos = await response.json();
-                console.log('✅ R2 loaded:', videos.length, 'videos');
-                localStorage.setItem('videoGallery', JSON.stringify(videos));
-                return videos;
+                this.videos = await response.json();
+                localStorage.setItem('videoGallery', JSON.stringify(this.videos));
+            } else {
+                this.videos = JSON.parse(localStorage.getItem('videoGallery') || '[]');
             }
         } catch(e) {
-            console.log('❌ R2 failed, using localStorage');
+            this.videos = JSON.parse(localStorage.getItem('videoGallery') || '[]');
         }
-        
-        const localVideos = JSON.parse(localStorage.getItem('videoGallery') || '[]');
-        console.log('💾 LocalStorage:', localVideos.length, 'videos');
-        return localVideos;
-    }
-
-    saveVideos() {
-        localStorage.setItem('videoGallery', JSON.stringify(this.videos));
-        console.log('💾 Saved locally:', this.videos.length);
+        this.updateTagFilter();
     }
 
     init() {
@@ -48,13 +27,33 @@ class VideoGallery {
         this.setupEventListeners();
     }
 
-    renderVideos(videos = this.videos) {
+    // 🔥 PAGINATION 4x5
+    getCurrentVideos() {
+        const filterTag = document.getElementById('tagFilter').value;
+        let filtered = this.videos;
+
+        if (filterTag) {
+            filtered = this.videos.filter(video => 
+                video.tags && video.tags.includes(filterTag)
+            );
+        }
+
+        const startIndex = (this.currentPage - 1) * this.videosPerPage;
+        return filtered.slice(startIndex, startIndex + this.videosPerPage);
+    }
+
+    renderVideos() {
+        const videos = this.getCurrentVideos();
         const grid = document.getElementById('videoGrid');
         grid.innerHTML = '';
+
         videos.forEach(video => {
             const card = this.createVideoCard(video);
             grid.appendChild(card);
         });
+
+        this.renderPagination();
+        document.title = `${this.videos.length} Videos - Gallery`;
     }
 
     createVideoCard(video) {
@@ -63,10 +62,10 @@ class VideoGallery {
         card.dataset.videoId = video.id;
         card.innerHTML = `
             <div class="video-thumbnail">
-                <img src="${video.thumbnail}" 
-                     alt="${video.title}" 
+                <img src="${video.thumbnail}" alt="${video.title}" 
                      loading="lazy" 
-                     onerror="this.src='https://via.placeholder.com/1280x720/333/fff?text=No+Image'">
+                     onerror="this.src='https://source.unsplash.com/1280x720/?video'">
+                ${video.tags ? video.tags.map(tag => `<span class="tag-badge">${tag}</span>`).join('') : ''}
             </div>
             <div class="video-info">
                 <h3>${video.title}</h3>
@@ -74,6 +73,68 @@ class VideoGallery {
             </div>
         `;
         return card;
+    }
+
+    // 🔥 PAGINATION NUMBERING
+    renderPagination() {
+        const totalPages = Math.ceil(this.getTotalVideos() / this.videosPerPage);
+        const pagination = document.getElementById('pagination');
+        pagination.innerHTML = '';
+
+        // Previous
+        const prev = document.createElement('button');
+        prev.className = 'page-btn';
+        prev.textContent = '← Prev';
+        prev.disabled = this.currentPage === 1;
+        prev.onclick = () => this.changePage(this.currentPage - 1);
+        pagination.appendChild(prev);
+
+        // Numbers
+        for (let i = 1; i <= totalPages; i++) {
+            const btn = document.createElement('button');
+            btn.className = `page-btn ${i === this.currentPage ? 'active' : ''}`;
+            btn.textContent = i;
+            btn.onclick = () => this.changePage(i);
+            pagination.appendChild(btn);
+        }
+
+        // Next
+        const next = document.createElement('button');
+        next.className = 'page-btn';
+        next.textContent = 'Next →';
+        next.disabled = this.currentPage === totalPages;
+        next.onclick = () => this.changePage(this.currentPage + 1);
+        pagination.appendChild(next);
+    }
+
+    getTotalVideos() {
+        const filterTag = document.getElementById('tagFilter').value;
+        if (!filterTag) return this.videos.length;
+        return this.videos.filter(v => v.tags && v.tags.includes(filterTag)).length;
+    }
+
+    changePage(page) {
+        this.currentPage = page;
+        this.renderVideos();
+    }
+
+    // 🔥 TAGS FILTER
+    updateTagFilter() {
+        const select = document.getElementById('tagFilter');
+        const tags = [...new Set(this.videos.flatMap(v => v.tags || []))];
+        select.innerHTML = '<option value="">📂 Semua (' + this.videos.length + ')</option>';
+        
+        tags.forEach(tag => {
+            const option = document.createElement('option');
+            option.value = tag;
+            option.textContent = `🏷️ ${tag}`;
+            select.appendChild(option);
+        });
+
+        select.onchange = () => {
+            this.currentPage = 1;
+            this.renderVideos();
+        };
     }
 
     setupEventListeners() {
@@ -84,34 +145,30 @@ class VideoGallery {
         document.getElementById('videoGrid').addEventListener('click', (e) => {
             if (e.target.closest('.video-card')) {
                 const videoId = e.target.closest('.video-card').dataset.videoId;
-                this.openModal(videoId);
+                this.openModal(parseInt(videoId));
             }
         });
 
-        document.querySelector('.close').addEventListener('click', () => {
-            this.closeModal();
-        });
-
-        window.addEventListener('click', (e) => {
-            if (e.target.classList.contains('modal')) {
-                this.closeModal();
-            }
-        });
-
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                this.closeModal();
-            }
-        });
+        // Modal events (sama)
+        document.querySelector('.close').onclick = () => this.closeModal();
+        window.onclick = (e) => {
+            if (e.target.classList.contains('modal')) this.closeModal();
+        };
+        document.onkeydown = (e) => {
+            if (e.key === 'Escape') this.closeModal();
+        };
     }
 
     searchVideos(query) {
         const filtered = this.videos.filter(video => 
             video.title.toLowerCase().includes(query.toLowerCase())
         );
-        this.renderVideos(filtered);
+        this.videos = filtered; // Temporary filter
+        this.currentPage = 1;
+        this.renderVideos();
     }
 
+    // Modal functions (sama seperti sebelumnya)
     openModal(id) {
         const video = this.videos.find(v => v.id == id);
         if (!video) return;
@@ -120,86 +177,72 @@ class VideoGallery {
         const player = document.getElementById('videoPlayer');
         player.innerHTML = '';
 
-        if (video.type === 'iframe') {
-            player.innerHTML = `
-                <iframe src="${video.embed}" 
-                        frameborder="0" 
-                        allowfullscreen 
-                        allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
-                        style="width:100%;height:100%;border:none;">
-                </iframe>
-            `;
-        } else if (video.type === 'mp4') {
-            player.innerHTML = `
-                <video controls preload="metadata" style="width:100%;height:100%;background:#000;">
-                    <source src="${video.url}" type="video/mp4">
-                    <source src="${video.url}" type="video/webm">
-                    Browser tidak mendukung video.
-                </video>
-            `;
+        if (video.type === 'iframe' && video.embed) {
+            player.innerHTML = `<iframe src="${video.embed}" frameborder="0" allowfullscreen allow="autoplay; fullscreen" style="width:100%;height:100%;"></iframe>`;
+        } else if (video.type === 'mp4' && video.url) {
+            player.innerHTML = `<video controls src="${video.url}" style="width:100%;height:100%;background:#000;"></video>`;
         }
 
         document.getElementById('videoModal').style.display = 'block';
         document.body.style.overflow = 'hidden';
     }
 
+    closeModal() {
+        document.getElementById('videoModal').style.display = 'none';
+        document.body.style.overflow = 'auto';
+    }
+
+    // 🔥 FORM dengan TAGS
     addVideo() {
         const title = document.getElementById('videoTitleInput').value.trim();
+        const thumb = document.getElementById('videoThumbInput').value.trim();
         const inputUrl = document.getElementById('videoEmbedInput').value.trim();
+        const tagsInput = document.getElementById('videoTagInput').value.trim();
         const duration = document.getElementById('videoDurationInput').value.trim() || '00:00';
 
         if (!title || !inputUrl) {
-            alert('❌ Judul dan URL wajib diisi!');
+            alert('❌ Judul & URL wajib!');
             return;
         }
 
-        const isMp4 = inputUrl.match(/\.(mp4|m3u8|webm|avi|mkv)$/i);
+        const tags = tagsInput ? tagsInput.split(',').map(t => t.trim()).filter(t => t) : [];
+        const isMp4 = inputUrl.match(/\.(mp4|m3u8|webm)$/i);
+
         const newVideo = {
             id: Date.now(),
-            title: title,
+            title,
+            tags,
             type: isMp4 ? 'mp4' : 'iframe',
             url: isMp4 ? inputUrl : '',
             embed: isMp4 ? '' : inputUrl,
-            duration: duration,
-            thumbnail: isMp4 
-                ? `https://via.placeholder.com/1280x720/1E3A8A/FFFFFF?text=${encodeURIComponent(title.substring(0,15))}`
-                : `https://source.unsplash.com/1280x720/?${this.getProvider(inputUrl) || 'movie'},dark`
+            duration,
+            thumbnail: thumb || `https://source.unsplash.com/1280x720/?${tags[0] || 'movie' || 'video'}`,
         };
 
         this.videos.unshift(newVideo);
         this.renderVideos();
         this.saveVideos();
+        this.updateTagFilter();
 
-        // Reset form
-        document.getElementById('videoTitleInput').value = '';
-        document.getElementById('videoEmbedInput').value = '';
-        document.getElementById('videoDurationInput').value = '';
+        // Reset
+        document.querySelectorAll('.form-group input').forEach(input => input.value = '');
         
-        alert(`✅ "${title}" ditambahkan!\n💾 Tersimpan permanen (local + R2 sync)`);
+        alert(`✅ "${title}" + ${tags.length} tags!\n📱 Page 1/20 videos`);
+    }
+
+    saveVideos() {
+        localStorage.setItem('videoGallery', JSON.stringify(this.videos));
     }
 
     getProvider(url) {
         if (url.includes('voe.sx')) return 'movie';
         if (url.includes('streamtape')) return 'film';
-        if (url.includes('dood')) return 'cinema';
-        if (url.includes('.mp4')) return 'video';
-        return 'movie';
-    }
-
-    closeModal() {
-        document.getElementById('videoModal').style.display = 'none';
-        document.body.style.overflow = 'auto';
-        document.getElementById('videoPlayer').innerHTML = '';
+        return 'video';
     }
 }
 
-// Global gallery untuk form
 let gallery;
-
-// HLS.js support (opsional)
 const hlsScript = document.createElement('script');
 hlsScript.src = 'https://cdn.jsdelivr.net/npm/hls.js@latest';
-hlsScript.onload = () => {
-    gallery = new VideoGallery();
-};
+hlsScript.onload = () => gallery = new VideoGallery();
 document.head.appendChild(hlsScript);
