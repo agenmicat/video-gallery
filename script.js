@@ -134,40 +134,64 @@ class VideoGallery {
 
     // 🔥 FORM TAMBAH VIDEO INSTAN
     addVideo() {
-        const title = document.getElementById('videoTitleInput').value.trim();
-        const embed = document.getElementById('videoEmbedInput').value.trim();
-        const duration = document.getElementById('videoDurationInput').value.trim() || '00:00';
+    const title = document.getElementById('videoTitleInput').value.trim();
+    const inputUrl = document.getElementById('videoEmbedInput').value.trim();
+    const duration = document.getElementById('videoDurationInput').value.trim() || '00:00';
 
-        if (!title || !embed) {
-            alert('❌ Judul dan Embed URL wajib diisi!');
-            return;
-        }
+    if (!title || !inputUrl) {
+        alert('❌ Judul dan URL wajib diisi!');
+        return;
+    }
 
-        const newVideo = {
-            id: Date.now(),
-            title: title,
-            embed: embed,
-            thumbnail: `https://via.placeholder.com/1280x720/FF6B6B/FFFFFF?text=${encodeURIComponent(title.substring(0,15))}`,
-            type: 'iframe',
-            duration: duration
-        };
+    // AUTO DETECT TYPE
+    const isMp4 = inputUrl.match(/\.(mp4|m3u8|webm)$/i);
+    const videoData = {
+        id: Date.now(),
+        title: title,
+        duration: duration,
+        type: isMp4 ? 'mp4' : 'iframe',
+        url: isMp4 ? inputUrl : '',
+        embed: isMp4 ? '' : inputUrl
+    };
 
-        this.videos.unshift(newVideo); // Tambah di atas
+    // SHOW LOADING
+    const loadingThumb = 'https://via.placeholder.com/1280x720/333/fff?text=Generating...';
+    videoData.thumbnail = loadingThumb;
+    this.videos.unshift(videoData);
+    this.renderVideos();
+
+    // GENERATE THUMBNAIL
+    this.generateSmartThumbnail(inputUrl, isMp4).then(thumb => {
+        videoData.thumbnail = thumb;
         this.renderVideos();
-        
-        // Reset form
-        document.getElementById('videoTitleInput').value = '';
-        document.getElementById('videoEmbedInput').value = '';
-        document.getElementById('videoDurationInput').value = '';
-        
-        alert('✅ Video baru berhasil ditambahkan!');
-    }
+        alert('✅ Video ditambah!\n📱 Auto thumbnail: ' + thumb.split('?')[0]);
+    });
 
-    closeModal() {
-        document.getElementById('videoModal').style.display = 'none';
-        document.body.style.overflow = 'auto';
-        document.getElementById('videoPlayer').innerHTML = '';
-    }
+    // RESET FORM
+    document.getElementById('videoTitleInput').value = '';
+    document.getElementById('videoEmbedInput').value = '';
+    document.getElementById('videoDurationInput').value = '';
+},
+
+generateSmartThumbnail(url, isMp4) {
+    return new Promise(resolve => {
+        if (!isMp4) {
+            // Iframe = Unsplash cinematic
+            resolve(`https://source.unsplash.com/1280x720/?${encodeURIComponent(['movie','film','cinema'][Math.floor(Math.random()*3)])}`);
+        } else {
+            // MP4 = coba YouTube style dulu
+            const videoId = url.split('/').pop().split('.')[0].substring(0,11);
+            const ytThumb = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+            
+            const img = new Image();
+            img.onload = () => resolve(ytThumb);
+            img.onerror = () => {
+                // Fallback Unsplash
+                resolve(`https://source.unsplash.com/1280x720/?video,dark`);
+            };
+            img.src = ytThumb;
+        }
+    });
 }
 
 // Global access untuk form
