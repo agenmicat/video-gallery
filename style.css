@@ -1,0 +1,24 @@
+* {margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Segoe UI',sans-serif;background:#0f0f0f;color:white;}
+.container{max-width:1400px;margin:0 auto;padding:20px;}
+header{text-align:center;margin-bottom:40px;}
+header h1{font-size:2.5rem;margin-bottom:20px;background:linear-gradient(45deg,#ff6b6b,#4ecdc4);background-clip:text;-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+#searchInput{width:100%;max-width:500px;padding:15px 20px;font-size:16px;border:2px solid #333;border-radius:50px;background:#1a1a1a;color:white;outline:none;transition:all .3s;}
+#searchInput:focus{border-color:#4ecdc4;box-shadow:0 0 20px rgba(78,205,196,.3);}
+.video-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(350px,1fr));gap:25px;margin-top:30px;}
+.video-card{background:#1a1a1a;border-radius:15px;overflow:hidden;transition:all .3s;cursor:pointer;}
+.video-card:hover{transform:translateY(-10px);box-shadow:0 20px 40px rgba(0,0,0,.5);}
+.video-thumbnail{width:100%;height:200px;background:#333;position:relative;}
+.video-thumbnail::before{content:'▶';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:3rem;color:rgba(255,255,255,.8);z-index:2;}
+.video-thumbnail img{width:100%;height:100%;object-fit:cover;}
+.video-info{padding:20px;}
+.video-info h3{font-size:1.2rem;margin-bottom:10px;}
+.video-info p{color:#aaa;font-size:.9rem;}
+.modal{display:none;position:fixed;z-index:1000;left:0;top:0;width:100%;height:100%;background:rgba(0,0,0,.95);backdrop-filter:blur(10px);}
+.modal-content{position:relative;max-width:1200px;margin:5% auto;border-radius:20px;overflow:hidden;}
+.close{position:absolute;top:20px;right:30px;font-size:2.5rem;color:white;cursor:pointer;z-index:1001;}
+.close:hover{color:#ff6b6b;}
+.video-player{width:100%;height:70vh;background:#000;}
+.video-player video{width:100%;height:100%;object-fit:contain;}
+.video-title{padding:20px;text-align:center;}
+@media(max-width:768px){.video-grid{grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:20px;}header h1{font-size:2rem;}.video-player{height:50vh;}}

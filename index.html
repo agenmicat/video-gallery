@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Gallery</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎥 Video Gallery</h1>
+            <input type="text" id="searchInput" placeholder="Cari video...">
+        </header>
+
+        <div class="video-grid" id="videoGrid">
+            <!-- Videos akan dimuat disini -->
+        </div>
+
+        <div class="modal" id="videoModal">
+            <div class="modal-content">
+                <span class="close">&times;</span>
+                <div class="video-player" id="videoPlayer"></div>
+                <div class="video-info">
+                    <h3 id="videoTitle"></h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
