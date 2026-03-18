@@ -3,44 +3,50 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🎥 Video Gallery</title>
+    <title>Video Gallery Pro</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>🎥 Video Gallery Pro</h1>
-            <input type="text" id="searchInput" placeholder="🔍 Cari video...">
-        </header>
+<div class="container">
 
-        <!-- FORM TAMBAH VIDEO -->
-        <div class="add-video-section">
-            <h2>➕ Tambah Video Baru</h2>
-            <div class="form-group">
-                <input type="text" id="videoTitleInput" placeholder="📝 Judul Video">
-                <input type="url" id="videoThumbInput" placeholder="🖼️ Thumbnail URL (opsional)">
-                <input type="url" id="videoEmbedInput" placeholder="🔗 VOE/Streamtape/MP4 URL">
-                <input type="text" id="videoDurationInput" placeholder="⏱️ 1:30:45">
-                <button onclick="gallery.addVideo()">➕ Tambah Video</button>
-            </div>
+    <header>
+        <h1>🎥 Video Gallery Pro</h1>
+        <input type="text" id="searchInput" placeholder="🔍 Cari video...">
+    </header>
+
+    <div class="add-video-section">
+        <h2>➕ Tambah Video</h2>
+        <div class="form-group">
+            <input type="text" id="videoTitleInput" placeholder="📝 Judul Video">
+            <input type="url" id="videoThumbInput" placeholder="🖼️ URL Thumbnail">
+            <input type="url" id="videoEmbedInput" placeholder="🔗 URL Video/Embed">
+            <input type="text" id="videoTagInput" placeholder="🏷️ Tags: action,drama">
+            <input type="text" id="videoDurationInput" placeholder="⏱️ 1:30:45">
+            <button onclick="gallery.addVideo()">➕ Tambah</button>
         </div>
-
-        <div class="video-grid" id="videoGrid">
-            <!-- Videos akan muncul disini -->
+        <div class="controls-bottom">
+            <select id="tagFilter">
+                <option value="">📂 Semua Kategori</option>
+            </select>
+            <div class="pagination" id="pagination"></div>
         </div>
+    </div>
 
-        <!-- MODAL PLAYER -->
-        <div class="modal" id="videoModal">
-            <div class="modal-content">
-                <span class="close">&times;</span>
-                <div class="video-player" id="videoPlayer"></div>
-                <div class="video-info">
-                    <h3 id="videoTitle"></h3>
-                </div>
+    <div class="video-grid" id="videoGrid"></div>
+
+    <div class="pagination-bottom" id="paginationBottom"></div>
+
+    <div class="modal" id="videoModal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <div class="video-player" id="videoPlayer"></div>
+            <div class="video-title-bar">
+                <h3 id="videoTitle"></h3>
             </div>
         </div>
     </div>
 
-    <script src="script.js"></script>
+</div>
+<script src="script.js"></script>
 </body>
 </html>
