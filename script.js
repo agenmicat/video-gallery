@@ -3,7 +3,6 @@ class VideoGallery {
     // Ganti dengan URL Worker API kamu
     this.apiUrl = 'https://video-api.nenenbiadab.workers.dev';
 
-    // Inisialisasi variabel
     this.allVideos = [];
     this.filteredVideos = [];
     this.currentPage = 1;
@@ -11,39 +10,37 @@ class VideoGallery {
     this.currentTag = '';
     this.currentSearch = '';
 
-    // Muat data video dan inisialisasi setelah load selesai
     this.loadVideos().then(() => {
       this.init();
     });
   }
 
-  // Load data video dari Worker API / R2
+  // Load semua video dari API Worker
   loadVideos = async () => {
     try {
       const response = await fetch(this.apiUrl);
       if (response.ok) {
         this.allVideos = await response.json();
-        // Simpan juga ke localStorage sebagai backup sementara
         localStorage.setItem('videoGallery', JSON.stringify(this.allVideos));
         console.log('✅ Loaded:', this.allVideos.length, 'videos');
       } else {
         throw new Error('API fetch failed');
       }
     } catch (e) {
-      console.warn('❌ Loading from API failed, fallback to localStorage', e);
+      console.warn('❌ API gagal, pakai localStorage', e);
       this.allVideos = JSON.parse(localStorage.getItem('videoGallery') || '[]');
     }
     this.filteredVideos = [...this.allVideos];
-  }
+  };
 
-  // Inisialisasi: render dan event listener
+  // Init render dan setup event
   init = () => {
     this.updateTagFilter();
     this.renderVideos();
     this.setupEventListeners();
-  }
+  };
 
-  // Simpan data video ke database (worker API) dan localStorage
+  // Simpan data ke Worker API dan localStorage
   saveVideos = async () => {
     try {
       const response = await fetch(this.apiUrl, {
@@ -53,45 +50,18 @@ class VideoGallery {
       });
       const data = await response.json();
       if (data.success) {
-        console.log('✅ Saved to R2/Worker!');
+        console.log('✅ Berhasil simpan di R2');
       } else {
-        throw new Error('API save failed');
+        throw new Error('Save API gagal');
       }
     } catch (e) {
-      console.error('❌ Failed to save videos:', e.message);
-      alert('Error saat menyimpan video ke server!');
+      console.error('❌ Gagal simpan video:', e.message);
+      alert('Gagal menyimpan data ke server!');
     }
-    // Simpan juga lokal
     localStorage.setItem('videoGallery', JSON.stringify(this.allVideos));
-  }
-deleteVideo = async (id) => {
-  if (!confirm('Yakin ingin menghapus video ini? Tindakan ini tidak bisa dibatalkan.')) {
-    return;
-  }
+  };
 
-  try {
-    const response = await fetch(`${this.apiUrl}?id=${id}`, {
-      method: 'DELETE',
-    });
-
-    const result = await response.json();
-
-    if (result.success) {
-      // Hapus dari state lokal
-      this.allVideos = this.allVideos.filter(video => video.id.toString() !== id.toString());
-      this.filteredVideos = this.filteredVideos.filter(video => video.id.toString() !== id.toString());
-
-      this.updateTagFilter();
-      this.renderVideos();
-      alert('✅ Video berhasil dihapus!');
-    } else {
-      alert('⚠️ Gagal hapus video: ' + result.message);
-    }
-  } catch (error) {
-    alert('⚠️ Error saat menghapus video: ' + error.message);
-  }
-}
-  // Update filter berdasarkan kategori dan pencarian
+  // Apply filter kategori + search
   applyFilter = () => {
     this.filteredVideos = this.allVideos.filter(video => {
       const tagMatch = this.currentTag === '' || (video.tags && video.tags.includes(this.currentTag));
@@ -100,17 +70,17 @@ deleteVideo = async (id) => {
     });
     this.currentPage = 1;
     this.renderVideos();
-  }
+  };
 
   renderVideos = () => {
     const grid = document.getElementById('videoGrid');
     grid.innerHTML = '';
 
-    const startIndex = (this.currentPage - 1) * this.videosPerPage;
-    const endIndex = startIndex + this.videosPerPage;
-    const videosToShow = this.filteredVideos.slice(startIndex, endIndex);
+    const start = (this.currentPage - 1) * this.videosPerPage;
+    const end = start + this.videosPerPage;
+    const pageVideos = this.filteredVideos.slice(start, end);
 
-    if (videosToShow.length === 0) {
+    if (pageVideos.length === 0) {
       grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:60px;color:#aaa;">
         <h3>Tidak ada video ditemukan</h3>
       </div>`;
@@ -118,53 +88,51 @@ deleteVideo = async (id) => {
       return;
     }
 
-    videosToShow.forEach(video => {
+    pageVideos.forEach(video => {
       grid.appendChild(this.createVideoCard(video));
     });
 
     this.renderPagination();
-  }
+  };
 
   createVideoCard = video => {
-  const card = document.createElement('div');
-  card.className = 'video-card';
-  card.dataset.videoId = video.id;
+    const card = document.createElement('div');
+    card.className = 'video-card';
+    card.dataset.videoId = video.id;
 
-  const tagsHTML = video.tags && video.tags.length > 0
-    ? video.tags.map(tag => `<span class="tag-badge" onclick="gallery.filterByTag('${tag}'); event.stopPropagation();">${tag}</span>`).join('')
-    : '';
+    const tagsHTML = video.tags && video.tags.length > 0
+      ? video.tags.map(tag => `<span class="tag-badge" onclick="gallery.filterByTag('${tag}'); event.stopPropagation();">${tag}</span>`).join('')
+      : '';
 
-  card.innerHTML = `
-    <div class="video-thumbnail">
-      <img src="${video.thumbnail || 'https://via.placeholder.com/1280x720/333/fff?text=No+Image'}" 
-          alt="${video.title}" loading="lazy"
-          onerror="this.src='https://via.placeholder.com/1280x720/333/fff?text=No+Image'">
-      <button class="btn-delete" title="Hapus Video" 
-          onclick="gallery.deleteVideo('${video.id}'); event.stopPropagation();">✖</button>
-    </div>
-    <div class="video-info">
-      <h3>${video.title}</h3>
-      <p>⏱️ ${video.duration}</p>
-    </div>
-    <div class="tags-container">${tagsHTML}</div>
-  `;
-  card.addEventListener('click', () => this.openModal(video.id));
-  return card;
-}
+    card.innerHTML = `
+      <div class="video-thumbnail" style="position:relative;">
+        <img src="${video.thumbnail || 'https://via.placeholder.com/1280x720/333/fff?text=No+Image'}" 
+             alt="${video.title}" loading="lazy"
+             onerror="this.src='https://via.placeholder.com/1280x720/333/fff?text=No+Image'">
+        <button class="btn-delete" title="Hapus Video" onclick="gallery.deleteVideo('${video.id}'); event.stopPropagation();">✖</button>
+      </div>
+      <div class="video-info">
+        <h3>${video.title}</h3>
+        <p>⏱️ ${video.duration}</p>
+      </div>
+      <div class="tags-container">${tagsHTML}</div>
+    `;
+    card.addEventListener('click', () => this.openModal(video.id));
+    return card;
+  };
 
   renderPagination = () => {
     const totalPages = Math.ceil(this.filteredVideos.length / this.videosPerPage);
     const paginationTop = document.getElementById('pagination');
     const paginationBottom = document.getElementById('paginationBottom');
 
-    const createPaginationControls = () => {
+    const createControls = () => {
       const wrapper = document.createElement('div');
       wrapper.style.display = 'flex';
       wrapper.style.gap = '8px';
       wrapper.style.flexWrap = 'wrap';
       wrapper.style.justifyContent = 'center';
 
-      // Prev button
       const prevBtn = document.createElement('button');
       prevBtn.className = 'page-btn';
       prevBtn.textContent = '← Prev';
@@ -172,7 +140,6 @@ deleteVideo = async (id) => {
       prevBtn.onclick = () => this.changePage(this.currentPage - 1);
       wrapper.appendChild(prevBtn);
 
-      // Number buttons
       let startPage = Math.max(1, this.currentPage - 2);
       let endPage = Math.min(totalPages, this.currentPage + 2);
 
@@ -182,6 +149,7 @@ deleteVideo = async (id) => {
         firstBtn.textContent = '1';
         firstBtn.onclick = () => this.changePage(1);
         wrapper.appendChild(firstBtn);
+
         if (startPage > 2) {
           const dots = document.createElement('span');
           dots.textContent = '...';
@@ -193,7 +161,7 @@ deleteVideo = async (id) => {
 
       for (let i = startPage; i <= endPage; i++) {
         const pageBtn = document.createElement('button');
-        pageBtn.className = 'page-btn' + (i === this.currentPage ? ' active' : '');
+        pageBtn.className = 'page-btn ' + (i === this.currentPage ? 'active' : '');
         pageBtn.textContent = i;
         pageBtn.onclick = () => this.changePage(i);
         wrapper.appendChild(pageBtn);
@@ -214,7 +182,6 @@ deleteVideo = async (id) => {
         wrapper.appendChild(lastBtn);
       }
 
-      // Next button
       const nextBtn = document.createElement('button');
       nextBtn.className = 'page-btn';
       nextBtn.textContent = 'Next →';
@@ -222,7 +189,6 @@ deleteVideo = async (id) => {
       nextBtn.onclick = () => this.changePage(this.currentPage + 1);
       wrapper.appendChild(nextBtn);
 
-      // Info text
       const infoText = document.createElement('span');
       infoText.style.color = '#aaa';
       infoText.style.padding = '8px 15px';
@@ -235,11 +201,12 @@ deleteVideo = async (id) => {
 
     paginationTop.innerHTML = '';
     paginationBottom.innerHTML = '';
+
     if (totalPages > 1) {
-      paginationTop.appendChild(createPaginationControls());
-      paginationBottom.appendChild(createPaginationControls());
+      paginationTop.appendChild(createControls());
+      paginationBottom.appendChild(createControls());
     }
-  }
+  };
 
   changePage = (page) => {
     const totalPages = Math.ceil(this.filteredVideos.length / this.videosPerPage);
@@ -247,7 +214,7 @@ deleteVideo = async (id) => {
     this.currentPage = page;
     this.renderVideos();
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }
+  };
 
   updateTagFilter = () => {
     const select = document.getElementById('tagFilter');
@@ -261,34 +228,35 @@ deleteVideo = async (id) => {
       option.textContent = `🏷️ ${tag} (${count})`;
       select.appendChild(option);
     });
-  }
+  };
 
   filterByTag = (tag) => {
     this.currentTag = tag;
     document.getElementById('tagFilter').value = tag;
     this.applyFilter();
-  }
+  };
 
   setupEventListeners = () => {
-    document.getElementById('searchInput').addEventListener('input', (e) => {
+    document.getElementById('searchInput').addEventListener('input', e => {
       this.currentSearch = e.target.value.trim();
       this.applyFilter();
     });
-    document.getElementById('tagFilter').addEventListener('change', (e) => {
+
+    document.getElementById('tagFilter').addEventListener('change', e => {
       this.currentTag = e.target.value;
       this.applyFilter();
     });
 
     document.querySelector('.close').addEventListener('click', () => this.closeModal());
-    window.addEventListener('click', (e) => {
+    window.addEventListener('click', e => {
       if (e.target.classList.contains('modal')) this.closeModal();
     });
-    document.addEventListener('keydown', (e) => {
+    document.addEventListener('keydown', e => {
       if (e.key === 'Escape') this.closeModal();
     });
-  }
+  };
 
-  openModal = (id) => {
+  openModal = id => {
     const video = this.allVideos.find(v => v.id == id);
     if (!video) return;
 
@@ -298,30 +266,58 @@ deleteVideo = async (id) => {
 
     if (video.type === 'iframe' && video.embed) {
       player.innerHTML = `
-        <iframe src="${video.embed}"
-                frameborder="0"
-                allowfullscreen
+        <iframe src="${video.embed}" 
+                frameborder="0" 
+                allowfullscreen 
                 allow="autoplay; fullscreen; picture-in-picture"
                 style="width:100%;height:100%;border:none;">
         </iframe>`;
     } else if (video.type === 'mp4' && video.url) {
       player.innerHTML = `
-        <video controls preload="metadata"
+        <video controls preload="metadata" 
                style="width:100%;height:100%;background:#000;">
-          <source src="${video.url}" type="video/mp4" />
-          Browser anda tidak mendukung video ini.
+          <source src="${video.url}" type="video/mp4">
+          Browser anda tidak mendukung video ini
         </video>`;
     }
 
     document.getElementById('videoModal').style.display = 'block';
     document.body.style.overflow = 'hidden';
-  }
+  };
 
   closeModal = () => {
     document.getElementById('videoModal').style.display = 'none';
     document.body.style.overflow = 'auto';
     document.getElementById('videoPlayer').innerHTML = '';
-  }
+  };
+
+  // Fungsi hapus video dengan API DELETE
+  deleteVideo = async id => {
+    if (!confirm('Yakin ingin menghapus video ini? Tindakan ini tidak bisa dibatalkan.')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`${this.apiUrl}?id=${id}`, {
+        method: 'DELETE',
+      });
+      const data = await response.json();
+
+      if (data.success) {
+        // Hapus dari list lokal
+        this.allVideos = this.allVideos.filter(video => video.id.toString() !== id.toString());
+        this.filteredVideos = this.filteredVideos.filter(video => video.id.toString() !== id.toString());
+
+        this.updateTagFilter();
+        this.renderVideos();
+        alert('✅ Video berhasil dihapus!');
+      } else {
+        alert('⚠️ Gagal menghapus video: ' + (data.message || 'Unknown error'));
+      }
+    } catch (error) {
+      alert('⚠️ Error saat menghapus video: ' + error.message);
+    }
+  };
 
   addVideo = async () => {
     const title = document.getElementById('videoTitleInput').value.trim();
@@ -339,9 +335,7 @@ deleteVideo = async (id) => {
       return;
     }
 
-    const tags = tagsRaw
-      ? tagsRaw.split(',').map(t => t.trim().toLowerCase()).filter(t => t !== '')
-      : [];
+    const tags = tagsRaw ? tagsRaw.split(',').map(t => t.trim().toLowerCase()).filter(t => t !== '') : [];
 
     const isMp4 = /\.(mp4|m3u8|webm|avi|mkv)$/i.test(inputUrl);
 
@@ -353,10 +347,9 @@ deleteVideo = async (id) => {
       url: isMp4 ? inputUrl : '',
       embed: isMp4 ? '' : inputUrl,
       duration,
-      tags
+      tags,
     };
 
-    // Tombol loading
     const btn = document.querySelector('.form-group button');
     btn.textContent = '⏳ Menyimpan...';
     btn.disabled = true;
@@ -375,7 +368,6 @@ deleteVideo = async (id) => {
     this.updateTagFilter();
     this.renderVideos();
 
-    // Reset form
     document.getElementById('videoTitleInput').value = '';
     document.getElementById('videoThumbInput').value = '';
     document.getElementById('videoEmbedInput').value = '';
@@ -386,10 +378,10 @@ deleteVideo = async (id) => {
     btn.disabled = false;
 
     alert(`✅ Video "${title}" berhasil ditambahkan!`);
-  }
+  };
 }
 
-// Inisialisasi objek gallery di global scope supaya fungsi HTML bisa akses
+// Global gallery
 let gallery;
 const hlsScript = document.createElement('script');
 hlsScript.src = 'https://cdn.jsdelivr.net/npm/hls.js@latest';
@@ -397,3 +389,26 @@ hlsScript.onload = () => {
   gallery = new VideoGallery();
 };
 document.head.appendChild(hlsScript);
+
+.btn-delete {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(255, 0, 0, 0.8);
+  border: none;
+  border-radius: 50%;
+  color: white;
+  font-weight: bold;
+  font-size: 1rem;
+  cursor: pointer;
+  width: 28px;
+  height: 28px;
+  line-height: 26px;
+  text-align: center;
+  transition: background 0.3s;
+  z-index: 10;
+}
+
+.btn-delete:hover {
+  background: rgba(255, 0, 0, 1);
+}
