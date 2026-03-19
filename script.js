@@ -216,8 +216,8 @@ const gallery = new VideoGallery();
 const hlsScript = document.createElement('script');
 hlsScript.src = 'https://cdn.jsdelivr.net/npm/hls.js@latest';
 hlsScript.onload = () => {
-  const isWatch = window.location.pathname.endsWith('watch.html');
-  if (isWatch) loadWatchPage();
+  const isWatchPage = window.location.pathname.endsWith('watch.html');
+  if (isWatchPage) loadWatchPage();
   else gallery.init();
 };
 document.head.appendChild(hlsScript);
