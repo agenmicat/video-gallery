@@ -139,12 +139,15 @@ async function loadWatchPage() {
     return;
   }
 
-  const res = await fetch(apiUrl);
-  if (!res.ok) {
-    document.getElementById('videoPlayer').textContent = 'Gagal memuat video';
-    return;
+  let videos;
+  try {
+    const res = await fetch(apiUrl);
+    if (!res.ok) throw new Error('Gagal memuat data');
+    videos = await res.json();
+  } catch {
+    videos = [];
   }
-  const videos = await res.json();
+  
   const video = videos.find(v => v.id.toString() === id);
   if (!video) {
     document.getElementById('videoPlayer').textContent = 'Video tidak ditemukan';
@@ -153,8 +156,8 @@ async function loadWatchPage() {
 
   document.getElementById('videoTitle').textContent = video.title;
 
-  const container = document.getElementById('videoPlayer');
-  container.innerHTML = '';
+  const playerContainer = document.getElementById('videoPlayer');
+  playerContainer.innerHTML = '';
 
   if (video.type === 'mp4' && video.url) {
     const videoElem = document.createElement('video');
@@ -162,52 +165,48 @@ async function loadWatchPage() {
     videoElem.src = video.url;
     videoElem.style.width = '100%';
     videoElem.style.height = '100%';
-    container.appendChild(videoElem);
+    playerContainer.appendChild(videoElem);
   } else if (video.type === 'iframe' && video.embed) {
-    const iframe = document.createElement('iframe');
-    iframe.src = video.embed;
-    iframe.allowFullscreen = true;
-    iframe.style.width = '100%';
-    iframe.style.height = '100%';
-    container.appendChild(iframe);
+    const iframeElem = document.createElement('iframe');
+    iframeElem.src = video.embed;
+    iframeElem.frameBorder = 0;
+    iframeElem.allowFullscreen = true;
+    iframeElem.style.width = '100%';
+    iframeElem.style.height = '100%';
+    playerContainer.appendChild(iframeElem);
+  } else {
+    playerContainer.textContent = 'Tipe video tidak didukung.';
   }
 
-  // Related videos based on tags
-  const related = videos.filter(
-    v =>
-      v.id.toString() !== id &&
-      video.tags &&
-      v.tags &&
-      v.tags.some(t => video.tags.includes(t))
-  );
+  // Render Related videos berdasarkan tags
+  const relatedContainer = document.getElementById('relatedVideos');
+  relatedContainer.innerHTML = '';
+  const relatedVideos = videos.filter(v => v.id !== video.id && video.tags && v.tags && v.tags.some(tag => video.tags.includes(tag)));
 
-  const relContainer = document.getElementById('relatedVideos');
-  relContainer.innerHTML = '';
-
-  if (related.length === 0) {
-    relContainer.innerHTML = '<p>Tidak ada video terkait.</p>';
+  if (relatedVideos.length === 0) {
+    relatedContainer.innerHTML = '<p>Tidak ada video terkait.</p>';
   } else {
-    related.forEach(v => {
-      const relCard = document.createElement('div');
-      relCard.className = 'video-card';
-      relCard.innerHTML = `
+    relatedVideos.forEach(rv => {
+      const card = document.createElement('div');
+      card.className = 'video-card';
+      card.innerHTML = `
         <div class="video-thumbnail">
-          <img src="${v.thumbnail || 'https://via.placeholder.com/400x225?text=No+Image'}" alt="${v.title}" />
+          <img src="${rv.thumbnail || 'https://via.placeholder.com/400x225?text=No+Image'}" alt="${rv.title}" />
         </div>
         <div class="video-info">
-          <h3>${v.title}</h3>
-          <p>⏱️ ${v.duration || '-'}</p>
+          <h3>${rv.title}</h3>
+          <p>⏱️ ${rv.duration || '-'}</p>
           <div class="tags-container">
-            ${(v.tags || []).map(tag => `<span class="tag-badge">${tag}</span>`).join('')}
+            ${(rv.tags || []).map(t => `<span class="tag-badge">${t}</span>`).join('')}
           </div>
         </div>
       `;
-      relCard.onclick = () => {
+      card.onclick = () => {
         const u = new URL(window.location);
-        u.searchParams.set('id', v.id);
+        u.searchParams.set('id', rv.id);
         window.location.href = u.toString();
       };
-      relContainer.appendChild(relCard);
+      relatedContainer.appendChild(card);
     });
   }
 }
