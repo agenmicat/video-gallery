@@ -424,3 +424,34 @@ header h1 {
     min-width: 100%;
   }
 }
+.modal {
+  position: fixed;
+  display: none;
+  z-index: 1000;
+  top: 0; left: 0;
+  width: 100vw; height: 100vh;
+  background-color: rgba(0, 0, 0, 0.9);
+  backdrop-filter: blur(8px);
+  overflow: auto;
+}
+.modal-content {
+  position: relative;
+  margin: 5vh auto;
+  max-width: 900px;
+  background: #111;
+  border-radius: 15px;
+  padding: 1rem;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8);
+}
+#closeModal {
+  position: absolute;
+  top: 10px;
+  right: 20px;
+  font-size: 2rem;
+  cursor: pointer;
+  color: #f44336;
+  font-weight: bold;
+}
+#closeModal:hover {
+  color: #ff7961;
+}
