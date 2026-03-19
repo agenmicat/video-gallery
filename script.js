@@ -65,7 +65,7 @@ class VideoGallery {
       `;
       card.onclick = () => {
         const url = new URL(window.location);
-        url.pathname = '/watch.html';
+        url.pathname = '/watch.html';  // PASTIKAN pakai watch.html bukan /watch
         url.searchParams.set('id', video.id);
         window.location.href = url.toString();
       };
@@ -132,82 +132,92 @@ class VideoGallery {
 
 // watch.html bagian video player & related
 async function loadWatchPage() {
+  console.log('loadWatchPage() mulai dijalankan');
+
   const urlParams = new URLSearchParams(window.location.search);
   const id = urlParams.get('id');
+  console.log('Video ID dari URL:', id);
+
   if (!id) {
-    document.getElementById('videoPlayer').textContent = 'Video tidak ditemukan';
+    document.getElementById('videoPlayer').textContent = 'Video tidak ditemukan (ID kosong).';
     return;
   }
 
-  let videos;
   try {
-    const res = await fetch(apiUrl);
-    if (!res.ok) throw new Error('Gagal memuat data');
-    videos = await res.json();
-  } catch {
-    videos = [];
-  }
-  
-  const video = videos.find(v => v.id.toString() === id);
-  if (!video) {
-    document.getElementById('videoPlayer').textContent = 'Video tidak ditemukan';
-    return;
-  }
+    const response = await fetch(apiUrl);
+    if (!response.ok) throw new Error('Gagal mengambil data video');
+    const videos = await response.json();
+    console.log('Daftar video diterima:', videos.length);
 
-  document.getElementById('videoTitle').textContent = video.title;
+    const video = videos.find(v => v.id.toString() === id);
+    if (!video) {
+      document.getElementById('videoPlayer').textContent = 'Video tidak ditemukan (ID salah).';
+      return;
+    }
 
-  const playerContainer = document.getElementById('videoPlayer');
-  playerContainer.innerHTML = '';
+    // Update judul video
+    document.getElementById('videoTitle').textContent = video.title;
 
-  if (video.type === 'mp4' && video.url) {
-    const videoElem = document.createElement('video');
-    videoElem.controls = true;
-    videoElem.src = video.url;
-    videoElem.style.width = '100%';
-    videoElem.style.height = '100%';
-    playerContainer.appendChild(videoElem);
-  } else if (video.type === 'iframe' && video.embed) {
-    const iframeElem = document.createElement('iframe');
-    iframeElem.src = video.embed;
-    iframeElem.frameBorder = 0;
-    iframeElem.allowFullscreen = true;
-    iframeElem.style.width = '100%';
-    iframeElem.style.height = '100%';
-    playerContainer.appendChild(iframeElem);
-  } else {
-    playerContainer.textContent = 'Tipe video tidak didukung.';
-  }
+    // Render player
+    const container = document.getElementById('videoPlayer');
+    container.innerHTML = ''; // Kosongkan dulu
 
-  // Render Related videos berdasarkan tags
-  const relatedContainer = document.getElementById('relatedVideos');
-  relatedContainer.innerHTML = '';
-  const relatedVideos = videos.filter(v => v.id !== video.id && video.tags && v.tags && v.tags.some(tag => video.tags.includes(tag)));
+    if (video.type === 'mp4' && video.url) {
+      const videoEl = document.createElement('video');
+      videoEl.controls = true;
+      videoEl.autoplay = false;
+      videoEl.src = video.url;
+      videoEl.style.width = '100%';
+      videoEl.style.height = '100%';
+      container.appendChild(videoEl);
+    } else if (video.type === 'iframe' && video.embed) {
+      const iframe = document.createElement('iframe');
+      iframe.src = video.embed;
+      iframe.frameBorder = '0';
+      iframe.allowFullscreen = true;
+      iframe.style.width = '100%';
+      iframe.style.height = '100%';
+      container.appendChild(iframe);
+    } else {
+      container.textContent = 'Tipe video tidak didukung.';
+    }
 
-  if (relatedVideos.length === 0) {
-    relatedContainer.innerHTML = '<p>Tidak ada video terkait.</p>';
-  } else {
-    relatedVideos.forEach(rv => {
-      const card = document.createElement('div');
-      card.className = 'video-card';
-      card.innerHTML = `
-        <div class="video-thumbnail">
-          <img src="${rv.thumbnail || 'https://via.placeholder.com/400x225?text=No+Image'}" alt="${rv.title}" />
-        </div>
-        <div class="video-info">
-          <h3>${rv.title}</h3>
-          <p>⏱️ ${rv.duration || '-'}</p>
-          <div class="tags-container">
-            ${(rv.tags || []).map(t => `<span class="tag-badge">${t}</span>`).join('')}
+    // Related videos
+    const relatedContainer = document.getElementById('relatedVideos');
+    relatedContainer.innerHTML = '';
+
+    const relatedVideos = videos.filter(v => v.id.toString() !== id && video.tags && v.tags && v.tags.some(t => video.tags.includes(t)));
+
+    if (relatedVideos.length === 0) {
+      relatedContainer.innerHTML = '<p>Tidak ada video terkait.</p>';
+    } else {
+      relatedVideos.forEach(rv => {
+        const relCard = document.createElement('div');
+        relCard.className = 'video-card';
+        relCard.innerHTML = `
+          <div class="video-thumbnail">
+            <img src="${rv.thumbnail || 'https://via.placeholder.com/400x225?text=No+Image'}" alt="${rv.title}" />
           </div>
-        </div>
-      `;
-      card.onclick = () => {
-        const u = new URL(window.location);
-        u.searchParams.set('id', rv.id);
-        window.location.href = u.toString();
-      };
-      relatedContainer.appendChild(card);
-    });
+          <div class="video-info">
+            <h3>${rv.title}</h3>
+            <p>⏱️ ${rv.duration || '-'}</p>
+            <div class="tags-container">
+              ${(rv.tags || []).map(tag => `<span class="tag-badge">${tag}</span>`).join('')}
+            </div>
+          </div>
+        `;
+        relCard.onclick = () => {
+          const u = new URL(window.location);
+          u.searchParams.set('id', rv.id);
+          window.location.href = u.toString();
+        };
+        relatedContainer.appendChild(relCard);
+      });
+    }
+
+  } catch (error) {
+    document.getElementById('videoPlayer').textContent = 'Error memuat video.';
+    console.error('Error fetch/loadWatchPage:', error);
   }
 }
 
@@ -216,8 +226,10 @@ const gallery = new VideoGallery();
 const hlsScript = document.createElement('script');
 hlsScript.src = 'https://cdn.jsdelivr.net/npm/hls.js@latest';
 hlsScript.onload = () => {
-  const isWatchPage = window.location.pathname.endsWith('watch.html');
-  if (isWatchPage) loadWatchPage();
-  else gallery.init();
+  if (window.location.pathname.endsWith('watch.html')) {
+    loadWatchPage(); // Panggil fungsi yang sudah di definisikan di atas
+  } else {
+    gallery.init(); // Inisialisasi gallery biasa
+  }
 };
 document.head.appendChild(hlsScript);
