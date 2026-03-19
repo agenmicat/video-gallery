@@ -1,6 +1,5 @@
 class VideoGallery {
   constructor() {
-    // Ganti dengan URL Worker API kamu
     this.apiUrl = 'https://video-api.nenenbiadab.workers.dev';
 
     this.allVideos = [];
@@ -15,7 +14,6 @@ class VideoGallery {
     });
   }
 
-  // Load semua video dari API Worker
   loadVideos = async () => {
     try {
       const response = await fetch(this.apiUrl);
@@ -33,14 +31,12 @@ class VideoGallery {
     this.filteredVideos = [...this.allVideos];
   };
 
-  // Init render dan setup event
   init = () => {
     this.updateTagFilter();
     this.renderVideos();
     this.setupEventListeners();
   };
 
-  // Simpan data ke Worker API dan localStorage
   saveVideos = async () => {
     try {
       const response = await fetch(this.apiUrl, {
@@ -61,7 +57,6 @@ class VideoGallery {
     localStorage.setItem('videoGallery', JSON.stringify(this.allVideos));
   };
 
-  // Apply filter kategori + search
   applyFilter = () => {
     this.filteredVideos = this.allVideos.filter(video => {
       const tagMatch = this.currentTag === '' || (video.tags && video.tags.includes(this.currentTag));
@@ -276,8 +271,8 @@ class VideoGallery {
       player.innerHTML = `
         <video controls preload="metadata" 
                style="width:100%;height:100%;background:#000;">
-          <source src="${video.url}" type="video/mp4">
-          Browser anda tidak mendukung video ini
+          <source src="${video.url}" type="video/mp4" />
+          Browser Anda tidak mendukung video.
         </video>`;
     }
 
@@ -291,20 +286,14 @@ class VideoGallery {
     document.getElementById('videoPlayer').innerHTML = '';
   };
 
-  // Fungsi hapus video dengan API DELETE
   deleteVideo = async id => {
-    if (!confirm('Yakin ingin menghapus video ini? Tindakan ini tidak bisa dibatalkan.')) {
-      return;
-    }
+    if (!confirm('Yakin ingin menghapus video ini? Tindakan ini tidak bisa dibatalkan.')) return;
 
     try {
-      const response = await fetch(`${this.apiUrl}?id=${id}`, {
-        method: 'DELETE',
-      });
-      const data = await response.json();
+      const response = await fetch(`${this.apiUrl}?id=${id}`, { method: 'DELETE' });
+      const result = await response.json();
 
-      if (data.success) {
-        // Hapus dari list lokal
+      if (result.success) {
         this.allVideos = this.allVideos.filter(video => video.id.toString() !== id.toString());
         this.filteredVideos = this.filteredVideos.filter(video => video.id.toString() !== id.toString());
 
@@ -312,10 +301,10 @@ class VideoGallery {
         this.renderVideos();
         alert('✅ Video berhasil dihapus!');
       } else {
-        alert('⚠️ Gagal menghapus video: ' + (data.message || 'Unknown error'));
+        alert('⚠️ Gagal menghapus video: ' + (result.message || 'Tidak diketahui'));
       }
-    } catch (error) {
-      alert('⚠️ Error saat menghapus video: ' + error.message);
+    } catch (e) {
+      alert('⚠️ Terjadi error saat menghapus video: ' + e.message);
     }
   };
 
@@ -381,7 +370,7 @@ class VideoGallery {
   };
 }
 
-// Global gallery
+// Init gallery global variable
 let gallery;
 const hlsScript = document.createElement('script');
 hlsScript.src = 'https://cdn.jsdelivr.net/npm/hls.js@latest';
@@ -389,26 +378,3 @@ hlsScript.onload = () => {
   gallery = new VideoGallery();
 };
 document.head.appendChild(hlsScript);
-
-.btn-delete {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  background: rgba(255, 0, 0, 0.8);
-  border: none;
-  border-radius: 50%;
-  color: white;
-  font-weight: bold;
-  font-size: 1rem;
-  cursor: pointer;
-  width: 28px;
-  height: 28px;
-  line-height: 26px;
-  text-align: center;
-  transition: background 0.3s;
-  z-index: 10;
-}
-
-.btn-delete:hover {
-  background: rgba(255, 0, 0, 1);
-}
