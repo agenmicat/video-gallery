@@ -1,280 +1,380 @@
-const apiUrl = 'https://video-api.nenenbiadab.workers.dev';
-
 class VideoGallery {
   constructor() {
+    this.apiUrl = 'https://video-api.nenenbiadab.workers.dev';
+
     this.allVideos = [];
     this.filteredVideos = [];
     this.currentPage = 1;
     this.videosPerPage = 20;
     this.currentTag = '';
     this.currentSearch = '';
+
+    this.loadVideos().then(() => {
+      this.init();
+    });
   }
 
-  async loadVideos() {
+  loadVideos = async () => {
     try {
-      const res = await fetch(apiUrl);
-      if (res.ok) {
-        this.allVideos = await res.json();
+      const response = await fetch(this.apiUrl);
+      if (response.ok) {
+        this.allVideos = await response.json();
+        localStorage.setItem('videoGallery', JSON.stringify(this.allVideos));
+        console.log('✅ Loaded:', this.allVideos.length, 'videos');
       } else {
-        throw new Error('Fetch gagal: ' + res.status);
+        throw new Error('API fetch failed');
       }
     } catch (e) {
-      this.allVideos = [];
-      console.warn('Fetch error, fallback ke kosong', e);
+      console.warn('❌ API gagal, pakai localStorage', e);
+      this.allVideos = JSON.parse(localStorage.getItem('videoGallery') || '[]');
     }
     this.filteredVideos = [...this.allVideos];
-  }
+  };
 
-  applyFilter() {
+  init = () => {
+    this.updateTagFilter();
+    this.renderVideos();
+    this.setupEventListeners();
+  };
+
+  saveVideos = async () => {
+    try {
+      const response = await fetch(this.apiUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(this.allVideos),
+      });
+      const data = await response.json();
+      if (data.success) {
+        console.log('✅ Berhasil simpan di R2');
+      } else {
+        throw new Error('Save API gagal');
+      }
+    } catch (e) {
+      console.error('❌ Gagal simpan video:', e.message);
+      alert('Gagal menyimpan data ke server!');
+    }
+    localStorage.setItem('videoGallery', JSON.stringify(this.allVideos));
+  };
+
+  applyFilter = () => {
     this.filteredVideos = this.allVideos.filter(video => {
       const tagMatch = this.currentTag === '' || (video.tags && video.tags.includes(this.currentTag));
       const searchMatch = this.currentSearch === '' || video.title.toLowerCase().includes(this.currentSearch.toLowerCase());
       return tagMatch && searchMatch;
     });
     this.currentPage = 1;
-  }
+    this.renderVideos();
+  };
 
-  renderGallery() {
+  renderVideos = () => {
     const grid = document.getElementById('videoGrid');
-    if (!grid) return;
     grid.innerHTML = '';
 
     const start = (this.currentPage - 1) * this.videosPerPage;
     const end = start + this.videosPerPage;
-    const videos = this.filteredVideos.slice(start, end);
+    const pageVideos = this.filteredVideos.slice(start, end);
 
-    if (videos.length === 0) {
-      grid.innerHTML = '<p style="color:#aaa; text-align:center; width:100%;">Tidak ada video ditemukan.</p>';
+    if (pageVideos.length === 0) {
+      grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:60px;color:#aaa;">
+        <h3>Tidak ada video ditemukan</h3>
+      </div>`;
+      this.renderPagination();
       return;
     }
 
-    videos.forEach(video => {
-      const card = document.createElement('div');
-      card.className = 'video-card';
-      card.dataset.videoId = video.id;
-
-      const tagsHTML = (video.tags || []).map(tag => `
-        <span class="tag-badge" onclick="gallery.filterByTag('${tag}'); event.stopPropagation();">${tag}</span>
-      `).join('');
-
-      card.innerHTML = `
-        <div class="video-thumbnail" style="position:relative;">
-          <img src="${video.thumbnail || 'https://via.placeholder.com/400x225?text=No+Image'}" alt="${video.title}" />
-        </div>
-        <div class="video-info">
-          <h3>${video.title}</h3>
-          <p>⏱️ ${video.duration || '-'}</p>
-          <div class="tags-container">${tagsHTML}</div>
-        </div>
-      `;
-
-      card.onclick = () => this.openModal(video.id);
-
-      grid.appendChild(card);
+    pageVideos.forEach(video => {
+      grid.appendChild(this.createVideoCard(video));
     });
-  }
 
-  renderPagination() {
+    this.renderPagination();
+  };
+
+  createVideoCard = video => {
+    const card = document.createElement('div');
+    card.className = 'video-card';
+    card.dataset.videoId = video.id;
+
+    const tagsHTML = video.tags && video.tags.length > 0
+      ? video.tags.map(tag => `<span class="tag-badge" onclick="gallery.filterByTag('${tag}'); event.stopPropagation();">${tag}</span>`).join('')
+      : '';
+
+    card.innerHTML = `
+      <div class="video-thumbnail" style="position:relative;">
+        <img src="${video.thumbnail || 'https://via.placeholder.com/1280x720/333/fff?text=No+Image'}" 
+             alt="${video.title}" loading="lazy"
+             onerror="this.src='https://via.placeholder.com/1280x720/333/fff?text=No+Image'">
+        <button class="btn-delete" title="Hapus Video" onclick="gallery.deleteVideo('${video.id}'); event.stopPropagation();">✖</button>
+      </div>
+      <div class="video-info">
+        <h3>${video.title}</h3>
+        <p>⏱️ ${video.duration}</p>
+      </div>
+      <div class="tags-container">${tagsHTML}</div>
+    `;
+    card.addEventListener('click', () => this.openModal(video.id));
+    return card;
+  };
+
+  renderPagination = () => {
     const totalPages = Math.ceil(this.filteredVideos.length / this.videosPerPage);
     const paginationTop = document.getElementById('pagination');
     const paginationBottom = document.getElementById('paginationBottom');
 
-    function createControls(current, total, changePage) {
-      const container = document.createElement('div');
-      container.style.display = 'flex';
-      container.style.gap = '8px';
-      container.style.flexWrap = 'wrap';
-      container.style.justifyContent = 'center';
+    const createControls = () => {
+      const wrapper = document.createElement('div');
+      wrapper.style.display = 'flex';
+      wrapper.style.gap = '8px';
+      wrapper.style.flexWrap = 'wrap';
+      wrapper.style.justifyContent = 'center';
 
-      const prev = document.createElement('button');
-      prev.className = 'page-btn';
-      prev.textContent = '← Prev';
-      prev.disabled = current === 1;
-      prev.onclick = () => changePage(current - 1);
-      container.appendChild(prev);
+      const prevBtn = document.createElement('button');
+      prevBtn.className = 'page-btn';
+      prevBtn.textContent = '← Prev';
+      prevBtn.disabled = this.currentPage === 1;
+      prevBtn.onclick = () => this.changePage(this.currentPage - 1);
+      wrapper.appendChild(prevBtn);
 
-      let startPage = Math.max(1, current - 2);
-      let endPage = Math.min(total, current + 2);
+      let startPage = Math.max(1, this.currentPage - 2);
+      let endPage = Math.min(totalPages, this.currentPage + 2);
 
       if (startPage > 1) {
-        container.appendChild(createPageBtn(1, current, changePage));
-        if (startPage > 2) container.appendChild(createEllipsis());
+        const firstBtn = document.createElement('button');
+        firstBtn.className = 'page-btn';
+        firstBtn.textContent = '1';
+        firstBtn.onclick = () => this.changePage(1);
+        wrapper.appendChild(firstBtn);
+
+        if (startPage > 2) {
+          const dots = document.createElement('span');
+          dots.textContent = '...';
+          dots.style.color = '#aaa';
+          dots.style.padding = '8px';
+          wrapper.appendChild(dots);
+        }
       }
 
       for (let i = startPage; i <= endPage; i++) {
-        container.appendChild(createPageBtn(i, current, changePage));
+        const pageBtn = document.createElement('button');
+        pageBtn.className = 'page-btn ' + (i === this.currentPage ? 'active' : '');
+        pageBtn.textContent = i;
+        pageBtn.onclick = () => this.changePage(i);
+        wrapper.appendChild(pageBtn);
       }
 
-      if (endPage < total) {
-        if (endPage < total - 1) container.appendChild(createEllipsis());
-        container.appendChild(createPageBtn(total, current, changePage));
+      if (endPage < totalPages) {
+        if (endPage < totalPages - 1) {
+          const dots = document.createElement('span');
+          dots.textContent = '...';
+          dots.style.color = '#aaa';
+          dots.style.padding = '8px';
+          wrapper.appendChild(dots);
+        }
+        const lastBtn = document.createElement('button');
+        lastBtn.className = 'page-btn';
+        lastBtn.textContent = totalPages;
+        lastBtn.onclick = () => this.changePage(totalPages);
+        wrapper.appendChild(lastBtn);
       }
 
-      const next = document.createElement('button');
-      next.className = 'page-btn';
-      next.textContent = 'Next →';
-      next.disabled = current === total || total === 0;
-      next.onclick = () => changePage(current + 1);
-      container.appendChild(next);
+      const nextBtn = document.createElement('button');
+      nextBtn.className = 'page-btn';
+      nextBtn.textContent = 'Next →';
+      nextBtn.disabled = this.currentPage === totalPages || totalPages === 0;
+      nextBtn.onclick = () => this.changePage(this.currentPage + 1);
+      wrapper.appendChild(nextBtn);
 
-      const info = document.createElement('span');
-      info.style.color = '#aaa';
-      info.style.padding = '8px 15px';
-      info.style.fontSize = '13px';
-      info.textContent = `${this.filteredVideos.length} video | Halaman ${this.currentPage} dari ${total || 1}`;
-      container.appendChild(info);
+      const infoText = document.createElement('span');
+      infoText.style.color = '#aaa';
+      infoText.style.padding = '8px 15px';
+      infoText.style.fontSize = '13px';
+      infoText.textContent = `${this.filteredVideos.length} video | Halaman ${this.currentPage} dari ${totalPages || 1}`;
+      wrapper.appendChild(infoText);
 
-      return container;
+      return wrapper;
+    };
 
-      function createPageBtn(pageNum, curr, changePageFn) {
-        const btn = document.createElement('button');
-        btn.className = 'page-btn' + (pageNum === curr ? ' active' : '');
-        btn.textContent = pageNum;
-        btn.onclick = () => changePageFn(pageNum);
-        return btn;
-      }
+    paginationTop.innerHTML = '';
+    paginationBottom.innerHTML = '';
 
-      function createEllipsis() {
-        const span = document.createElement('span');
-        span.textContent = '...';
-        span.style.color = '#aaa';
-        span.style.padding = '8px';
-        return span;
-      }
+    if (totalPages > 1) {
+      paginationTop.appendChild(createControls());
+      paginationBottom.appendChild(createControls());
     }
-
-    if (paginationTop) {
-      paginationTop.innerHTML = '';
-      if (totalPages > 1) paginationTop.appendChild(createControls.call(this, this.currentPage, totalPages, this.changePage.bind(this)));
-    }
-    if (paginationBottom) {
-      paginationBottom.innerHTML = '';
-      if (totalPages > 1) paginationBottom.appendChild(createControls.call(this, this.currentPage, totalPages, this.changePage.bind(this)));
-    }
-  }
+  };
 
   changePage = (page) => {
     const totalPages = Math.ceil(this.filteredVideos.length / this.videosPerPage);
     if (page < 1 || page > totalPages) return;
     this.currentPage = page;
-    this.renderGallery();
+    this.renderVideos();
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }
+  };
 
-  filterByTag = (tag) => {
-    this.currentTag = tag;
-    if (document.getElementById('tagFilter')) {
-      document.getElementById('tagFilter').value = tag;
-    }
-    this.currentSearch = '';
-    if (document.getElementById('searchInput')) {
-      document.getElementById('searchInput').value = '';
-    }
-    this.applyFilter();
-    this.renderGallery();
-  }
-
-  setupEvents() {
-    const searchInput = document.getElementById('searchInput');
-    if (searchInput) {
-      searchInput.addEventListener('input', e => {
-        this.currentSearch = e.target.value;
-        this.applyFilter();
-        this.renderGallery();
-      });
-    }
-
-    const tagFilter = document.getElementById('tagFilter');
-    if (tagFilter) {
-      tagFilter.addEventListener('change', e => {
-        this.currentTag = e.target.value;
-        this.applyFilter();
-        this.renderGallery();
-      });
-    }
-
-    const closeBtn = document.getElementById('closeModal');
-    const modal = document.getElementById('videoModal');
-    if (closeBtn)
-      closeBtn.onclick = () => this.closeModal();
-    if (modal)
-      window.onclick = event => {
-        if (event.target === modal) this.closeModal();
-      };
-
-    document.addEventListener('keydown', e => {
-      if (e.key === 'Escape') this.closeModal();
-    });
-  }
-
-  openModal(videoId) {
-    const video = this.allVideos.find(v => v.id === videoId);
-    if (!video) return;
-
-    const modal = document.getElementById('videoModal');
-    const player = document.getElementById('videoPlayer');
-    const title = document.getElementById('videoTitle');
-
-    title.textContent = video.title;
-    player.innerHTML = '';
-
-    if (video.type === 'mp4' && video.url) {
-      const videoElem = document.createElement('video');
-      videoElem.controls = true;
-      videoElem.autoplay = true;
-      videoElem.src = video.url;
-      videoElem.style.width = '100%';
-      videoElem.style.height = '100%';
-      player.appendChild(videoElem);
-    } else if (video.type === 'iframe' && video.embed) {
-      const iframe = document.createElement('iframe');
-      iframe.src = video.embed;
-      iframe.frameBorder = '0';
-      iframe.allowFullscreen = true;
-      iframe.style.width = '100%';
-      iframe.style.height = '100%';
-      player.appendChild(iframe);
-    } else {
-      player.textContent = 'Tipe video tidak didukung.';
-    }
-
-    if (modal) {
-      modal.style.display = 'block';
-      document.body.style.overflow = 'hidden';
-    }
-  }
-
-  closeModal() {
-    const modal = document.getElementById('videoModal');
-    if (modal) {
-      modal.style.display = 'none';
-      document.body.style.overflow = 'auto';
-      const player = document.getElementById('videoPlayer');
-      player.innerHTML = ''; // stop video
-    }
-  }
-
-  populateTagFilter() {
+  updateTagFilter = () => {
     const select = document.getElementById('tagFilter');
-    if (!select) return;
-    const tags = new Set();
-    this.allVideos.forEach(v => (v.tags || []).forEach(t => tags.add(t)));
+    const allTags = [...new Set(this.allVideos.flatMap(v => v.tags || []))].sort();
+
     select.innerHTML = `<option value="">📂 Semua (${this.allVideos.length})</option>`;
-    Array.from(tags).sort().forEach(tag => {
-      const count = this.allVideos.filter(v => v.tags && v.tags.includes(tag)).length;
+    allTags.forEach(tag => {
+      const count = this.allVideos.filter(v => v.tags?.includes(tag)).length;
       const option = document.createElement('option');
       option.value = tag;
       option.textContent = `🏷️ ${tag} (${count})`;
       select.appendChild(option);
     });
-  }
+  };
+
+  filterByTag = (tag) => {
+    this.currentTag = tag;
+    document.getElementById('tagFilter').value = tag;
+    this.applyFilter();
+  };
+
+  setupEventListeners = () => {
+    document.getElementById('searchInput').addEventListener('input', e => {
+      this.currentSearch = e.target.value.trim();
+      this.applyFilter();
+    });
+
+    document.getElementById('tagFilter').addEventListener('change', e => {
+      this.currentTag = e.target.value;
+      this.applyFilter();
+    });
+
+    document.querySelector('.close').addEventListener('click', () => this.closeModal());
+    window.addEventListener('click', e => {
+      if (e.target.classList.contains('modal')) this.closeModal();
+    });
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') this.closeModal();
+    });
+  };
+
+  openModal = id => {
+    const video = this.allVideos.find(v => v.id == id);
+    if (!video) return;
+
+    document.getElementById('videoTitle').textContent = video.title;
+    const player = document.getElementById('videoPlayer');
+    player.innerHTML = '';
+
+    if (video.type === 'iframe' && video.embed) {
+      player.innerHTML = `
+        <iframe src="${video.embed}" 
+                frameborder="0" 
+                allowfullscreen 
+                allow="autoplay; fullscreen; picture-in-picture"
+                style="width:100%;height:100%;border:none;">
+        </iframe>`;
+    } else if (video.type === 'mp4' && video.url) {
+      player.innerHTML = `
+        <video controls preload="metadata" 
+               style="width:100%;height:100%;background:#000;">
+          <source src="${video.url}" type="video/mp4" />
+          Browser Anda tidak mendukung video.
+        </video>`;
+    }
+
+    document.getElementById('videoModal').style.display = 'block';
+    document.body.style.overflow = 'hidden';
+  };
+
+  closeModal = () => {
+    document.getElementById('videoModal').style.display = 'none';
+    document.body.style.overflow = 'auto';
+    document.getElementById('videoPlayer').innerHTML = '';
+  };
+
+  deleteVideo = async id => {
+    if (!confirm('Yakin ingin menghapus video ini? Tindakan ini tidak bisa dibatalkan.')) return;
+
+    try {
+      const response = await fetch(`${this.apiUrl}?id=${id}`, { method: 'DELETE' });
+      const result = await response.json();
+
+      if (result.success) {
+        this.allVideos = this.allVideos.filter(video => video.id.toString() !== id.toString());
+        this.filteredVideos = this.filteredVideos.filter(video => video.id.toString() !== id.toString());
+
+        this.updateTagFilter();
+        this.renderVideos();
+        alert('✅ Video berhasil dihapus!');
+      } else {
+        alert('⚠️ Gagal menghapus video: ' + (result.message || 'Tidak diketahui'));
+      }
+    } catch (e) {
+      alert('⚠️ Terjadi error saat menghapus video: ' + e.message);
+    }
+  };
+
+  addVideo = async () => {
+    const title = document.getElementById('videoTitleInput').value.trim();
+    const thumb = document.getElementById('videoThumbInput').value.trim();
+    const inputUrl = document.getElementById('videoEmbedInput').value.trim();
+    const tagsRaw = document.getElementById('videoTagInput').value.trim();
+    const duration = document.getElementById('videoDurationInput').value.trim() || '00:00';
+
+    if (!title) {
+      alert('⚠️ Judul video wajib diisi!');
+      return;
+    }
+    if (!inputUrl) {
+      alert('⚠️ URL video wajib diisi!');
+      return;
+    }
+
+    const tags = tagsRaw ? tagsRaw.split(',').map(t => t.trim().toLowerCase()).filter(t => t !== '') : [];
+
+    const isMp4 = /\.(mp4|m3u8|webm|avi|mkv)$/i.test(inputUrl);
+
+    const newVideo = {
+      id: Date.now(),
+      title,
+      thumbnail: thumb || 'https://via.placeholder.com/1280x720/1a1a2e/FFFFFF?text=' + encodeURIComponent(title.substring(0, 20)),
+      type: isMp4 ? 'mp4' : 'iframe',
+      url: isMp4 ? inputUrl : '',
+      embed: isMp4 ? '' : inputUrl,
+      duration,
+      tags,
+    };
+
+    const btn = document.querySelector('.form-group button');
+    btn.textContent = '⏳ Menyimpan...';
+    btn.disabled = true;
+
+    this.allVideos.unshift(newVideo);
+    this.filteredVideos = [...this.allVideos];
+    this.currentPage = 1;
+    this.currentTag = '';
+    this.currentSearch = '';
+
+    document.getElementById('tagFilter').value = '';
+    document.getElementById('searchInput').value = '';
+
+    await this.saveVideos();
+
+    this.updateTagFilter();
+    this.renderVideos();
+
+    document.getElementById('videoTitleInput').value = '';
+    document.getElementById('videoThumbInput').value = '';
+    document.getElementById('videoEmbedInput').value = '';
+    document.getElementById('videoTagInput').value = '';
+    document.getElementById('videoDurationInput').value = '';
+
+    btn.textContent = '➕ Tambah';
+    btn.disabled = false;
+
+    alert(`✅ Video "${title}" berhasil ditambahkan!`);
+  };
 }
 
-const gallery = new VideoGallery();
-
+// Init gallery global variable
+let gallery;
 const hlsScript = document.createElement('script');
 hlsScript.src = 'https://cdn.jsdelivr.net/npm/hls.js@latest';
 hlsScript.onload = () => {
-  gallery.init();
+  gallery = new VideoGallery();
 };
 document.head.appendChild(hlsScript);
